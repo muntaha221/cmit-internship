@@ -1,0 +1,89 @@
+Tuesday — Middleware Complete
+1. Middleware execution order ✅
+
+Middleware runs top to bottom in the order you register it.
+
+app.use((req, res, next) => {
+    console.log("First");
+    next();
+});
+
+
+app.use((req, res, next) => {
+    console.log("Second");
+    next();
+});
+
+
+app.get("/", (req, res) => {
+    console.log("Route");
+    res.json({ message: "Done" });
+});
+
+Flow:
+
+Request → First → Second → Route → Response
+
+next() means continue to the next middleware/route. Without it, the request stops there unless that middleware sends a response.
+
+2. Built-in and third-party middleware ✅
+
+Built-in:
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+express.json() lets you read JSON through:
+
+req.body
+
+Third-party: we installed morgan.
+
+const morgan = require("morgan");
+
+
+app.use(morgan("dev"));
+
+Morgan automatically logs requests like:
+
+GET /users 200 ...
+
+So:
+
+Built-in → provided by Express
+Third-party → installed with npm
+3. Request logging and request timing middleware ✅
+
+For logging, you can use Morgan, or create your own:
+
+function requestLogger(req, res, next) {
+    console.log(req.method, req.url);
+    next();
+}
+
+For timing:
+
+function requestTimer(req, res, next) {
+    const start = Date.now();
+
+
+    res.on("finish", () => {
+        const time = Date.now() - start;
+        console.log(`${req.method} ${req.url} took ${time}ms`);
+    });
+
+
+    next();
+}
+
+Flow:
+
+Request
+↓
+start timer
+↓
+route executes
+↓
+response finishes
+↓
+calculate elapsed time

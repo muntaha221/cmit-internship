@@ -1,0 +1,715 @@
+WEEK 6 — WEDNESDAY
+Controllers, Services and MVC
+========================================
+
+GOAL
+----
+Separate an Express API into routes, controllers, and services so that
+each layer has a clear responsibility and the project stays organized,
+reusable, and easy to maintain.
+
+WEDNESDAY ROADMAP
+-----------------
+1. Separate routes, controllers and services.
+2. Understand responsibilities of each layer.
+3. Create reusable service functions.
+4. Apply a clean folder structure.
+5. Refactor a single-file API into modules.
+
+IMPORTANT IDEA
+--------------
+The request flow is:
+
+Client
+  ↓
+Route
+  ↓
+Controller
+  ↓
+Service
+  ↓
+Result
+  ↓
+Controller sends response
+  ↓
+Client
+
+The goal is NOT to put all logic into the route file or app.js.
+
+--------------------------------------------------
+1. SEPARATE ROUTES, CONTROLLERS AND SERVICES
+--------------------------------------------------
+
+We created a separate Wednesday folder so the work can be tracked
+independently from the other days.
+
+Folder structure:
+
+week-6/
+└── wednesday/
+    ├── app.js
+    ├── controllers/
+    │   └── users.controller.js
+    ├── routes/
+    │   └── users.routes.js
+    └── services/
+        └── users.service.js
+
+The exact structure was verified with:
+
+tree /f
+
+and the result was:
+
+D:.
+│   app.js
+│
+├───controllers
+│       users.controller.js
+│
+├───routes
+│       users.routes.js
+│
+└───services
+        users.service.js
+
+
+--------------------------------------------------
+2. RESPONSIBILITY OF EACH LAYER
+--------------------------------------------------
+
+A. ROUTES
+---------
+
+The route layer decides:
+
+"Which controller should handle this HTTP method and URL?"
+
+Example:
+
+router.get("/", usersController.getUsers);
+
+The route should be kept small.
+
+It should mainly connect:
+
+HTTP request
+    ↓
+controller
+
+
+B. CONTROLLER
+-------------
+
+The controller handles the HTTP request and response.
+
+It receives:
+
+req
+res
+
+The controller calls the service, gets the result, and creates
+the HTTP response.
+
+Example:
+
+const usersService = require("../services/users.service");
+
+function getUsers(req, res) {
+    const users = usersService.getAllUsers();
+
+    res.status(200).json({
+        success: true,
+        message: "Users fetched successfully",
+        data: users
+    });
+}
+
+module.exports = {
+    getUsers
+};
+
+The controller therefore handles:
+
+- request information
+- calling services
+- status codes
+- response structure
+- sending JSON
+
+
+C. SERVICE
+----------
+
+The service contains the actual business/data logic.
+
+Example:
+
+function getAllUsers() {
+    return users;
+}
+
+The service should not need Express response objects such as:
+
+res.json(...)
+
+Its job is to perform the work and return a result.
+
+Simple rule:
+
+Route:
+    Where should the request go?
+
+Controller:
+    How should I handle the HTTP request/response?
+
+Service:
+    What actual data/business work should happen?
+
+
+--------------------------------------------------
+3. INITIAL WORKING EXAMPLE
+--------------------------------------------------
+
+A. users.service.js
+-------------------
+
+let users = [
+    {
+        id: 1,
+        name: "Moon",
+        email: "moon@example.com"
+    },
+    {
+        id: 2,
+        name: "Sara",
+        email: "sara@example.com"
+    }
+];
+
+function getAllUsers() {
+    return users;
+}
+
+module.exports = {
+    getAllUsers
+};
+
+
+B. users.controller.js
+----------------------
+
+const usersService = require("../services/users.service");
+
+function getUsers(req, res) {
+    const users = usersService.getAllUsers();
+
+    res.status(200).json({
+        success: true,
+        message: "Users fetched successfully",
+        data: users
+    });
+}
+
+module.exports = {
+    getUsers
+};
+
+
+C. users.routes.js
+------------------
+
+const express = require("express");
+const usersController = require("../controllers/users.controller");
+
+const router = express.Router();
+
+router.get("/", usersController.getUsers);
+
+module.exports = router;
+
+
+D. app.js
+---------
+
+const express = require("express");
+const usersRouter = require("./routes/users.routes");
+
+const app = express();
+
+const PORT = 3000;
+
+app.use(express.json());
+
+app.use("/users", usersRouter);
+
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
+
+
+--------------------------------------------------
+4. COMPLETE REQUEST FLOW
+--------------------------------------------------
+
+When the client requests:
+
+GET /users
+
+the request travels through the project like this:
+
+1. app.js starts the Express application.
+2. app.use("/users", usersRouter) sends /users requests
+   to the users router.
+3. users.routes.js matches router.get("/").
+4. users.controller.js runs getUsers().
+5. getUsers() calls usersService.getAllUsers().
+6. users.service.js returns the users array.
+7. The controller creates a JSON response.
+8. Express sends the response back to the client.
+
+Flow:
+
+GET /users
+    ↓
+app.js
+    ↓
+users.routes.js
+    ↓
+users.controller.js
+    ↓
+users.service.js
+    ↓
+users.controller.js
+    ↓
+JSON response
+
+
+--------------------------------------------------
+5. REUSABLE SERVICE FUNCTIONS
+--------------------------------------------------
+
+A service function should be reusable.
+
+Instead of writing the same user-search/data logic in multiple
+controllers, put it in a service once.
+
+We extended users.service.js with:
+
+let users = [
+    {
+        id: 1,
+        name: "Moon",
+        email: "moon@example.com"
+    },
+    {
+        id: 2,
+        name: "Sara",
+        email: "sara@example.com"
+    }
+];
+
+function getAllUsers() {
+    return users;
+}
+
+function getUserById(id) {
+    return users.find(function (user) {
+        return user.id === id;
+    });
+}
+
+function addUser(name, email) {
+    const newUser = {
+        id: users.length + 1,
+        name: name,
+        email: email
+    };
+
+    users.push(newUser);
+
+    return newUser;
+}
+
+module.exports = {
+    getAllUsers,
+    getUserById,
+    addUser
+};
+
+
+WHY THESE ARE REUSABLE
+----------------------
+
+The controller can call:
+
+usersService.getAllUsers();
+
+usersService.getUserById(1);
+
+usersService.addUser("Ali", "ali@example.com");
+
+The controller does not need to know how the data is stored or
+how the search/add logic works internally.
+
+The service does the work and returns the result.
+
+Flow:
+
+Controller
+   ↓
+Service function
+   ↓
+Service performs logic
+   ↓
+Result returned
+   ↓
+Controller sends response
+
+
+--------------------------------------------------
+6. CLEAN FOLDER STRUCTURE
+--------------------------------------------------
+
+The clean structure is:
+
+week-6/
+└── wednesday/
+    ├── app.js
+    ├── controllers/
+    │   └── users.controller.js
+    ├── routes/
+    │   └── users.routes.js
+    └── services/
+        └── users.service.js
+
+Meaning:
+
+routes/
+    HTTP method + URL mapping
+
+controllers/
+    request/response handling
+
+services/
+    business/data logic
+
+app.js
+    main Express application and startup
+
+
+WHY THIS STRUCTURE IS USEFUL
+----------------------------
+
+A single file can become very large if it contains:
+
+- routes
+- request handling
+- business logic
+- data logic
+- validation
+- responses
+
+Separating the files makes the project:
+
+- easier to read
+- easier to maintain
+- easier to debug
+- easier to reuse
+- easier to extend
+
+
+--------------------------------------------------
+7. REFACTORING A SINGLE-FILE API
+--------------------------------------------------
+
+A single-file API might originally look like:
+
+app.js
+
+    route
+      ↓
+    business logic
+      ↓
+    data operations
+      ↓
+    response
+
+As the application grows, this becomes difficult to manage.
+
+The refactored version becomes:
+
+app.js
+    ↓
+routes/
+    ↓
+controllers/
+    ↓
+services/
+
+
+Example:
+
+Before:
+
+app.js
+    - GET /users
+    - find users
+    - build JSON response
+    - POST /users
+    - create user
+    - validation
+    - more logic
+
+
+After:
+
+app.js
+    → mounts routers
+
+routes/users.routes.js
+    → maps URLs to controllers
+
+controllers/users.controller.js
+    → handles req/res
+
+services/users.service.js
+    → performs user/data logic
+
+
+That is the basic idea of modularization.
+
+
+--------------------------------------------------
+8. IMPORTANT DIFFERENCE BETWEEN LAYERS
+--------------------------------------------------
+
+Do NOT mix their responsibilities unnecessarily.
+
+ROUTE SHOULD NOT:
+- contain all business/data logic
+- directly implement large operations
+
+CONTROLLER SHOULD NOT:
+- become a giant data-processing layer
+- contain all database/data logic
+
+SERVICE SHOULD NOT:
+- send Express responses
+- depend on res.json() for its core job
+
+The clean separation is:
+
+Route
+    → routing
+
+Controller
+    → HTTP request/response
+
+Service
+    → data/business logic
+
+
+--------------------------------------------------
+9. COMMON FILE IMPORT/EXPORT CONNECTION
+--------------------------------------------------
+
+In CommonJS, the layers connect using require() and module.exports.
+
+Service exports functions:
+
+module.exports = {
+    getAllUsers,
+    getUserById,
+    addUser
+};
+
+Controller imports the service:
+
+const usersService = require("../services/users.service");
+
+Route imports the controller:
+
+const usersController = require("../controllers/users.controller");
+
+App imports the router:
+
+const usersRouter = require("./routes/users.routes");
+
+
+So the import chain is:
+
+app.js
+   ↓ require
+users.routes.js
+   ↓ require
+users.controller.js
+   ↓ require
+users.service.js
+
+
+--------------------------------------------------
+10. PRACTICAL VERIFICATION
+--------------------------------------------------
+
+From:
+
+week-6/wednesday
+
+run:
+
+node app.js
+
+Then request:
+
+http://localhost:3000/users
+
+Expected response:
+
+{
+  "success": true,
+  "message": "Users fetched successfully",
+  "data": [
+    {
+      "id": 1,
+      "name": "Moon",
+      "email": "moon@example.com"
+    },
+    {
+      "id": 2,
+      "name": "Sara",
+      "email": "sara@example.com"
+    }
+  ]
+}
+
+This successful response proved that:
+
+app.js
+    ↓
+route
+    ↓
+controller
+    ↓
+service
+
+was working correctly.
+
+
+--------------------------------------------------
+11. ERROR WE ENCOUNTERED
+--------------------------------------------------
+
+The project initially produced:
+
+MODULE_NOT_FOUND
+
+The reason was the filename was:
+
+users.services.js
+
+while the controller expected:
+
+users.service.js
+
+The controller contained:
+
+const usersService = require("../services/users.service");
+
+Node therefore searched for:
+
+services/users.service.js
+
+but the actual file was:
+
+services/users.services.js
+
+Fixing the filename resolved the problem.
+
+Correct:
+
+services/
+    users.service.js
+
+Lesson:
+
+Require paths and filenames must match exactly.
+
+
+--------------------------------------------------
+12. IMPORTANT MENTAL MODEL
+--------------------------------------------------
+
+Remember this:
+
+ROUTE
+"What URL and HTTP method is this?"
+
+CONTROLLER
+"What should I do with this request and what response should I send?"
+
+SERVICE
+"What actual work/data operation needs to happen?"
+
+
+The full flow:
+
+Client
+  ↓
+HTTP request
+  ↓
+Express app
+  ↓
+Router
+  ↓
+Controller
+  ↓
+Service
+  ↓
+Result
+  ↓
+Controller
+  ↓
+HTTP response
+  ↓
+Client
+
+
+--------------------------------------------------
+13. WEDNESDAY REVISION
+--------------------------------------------------
+
+The five Wednesday requirements were:
+
+1. Separate routes, controllers and services.
+   DONE
+
+2. Understand responsibilities of each layer.
+   DONE
+
+3. Create reusable service functions.
+   DONE
+
+4. Apply a clean folder structure.
+   DONE
+
+5. Refactor a single-file API into modules.
+   DONE
+
+
+--------------------------------------------------
+14. ONE-SENTENCE SUMMARY
+--------------------------------------------------
+
+Wednesday was about taking an Express API that could become one large
+file and separating it into:
+
+routes → controllers → services
+
+so that each layer has one clear responsibility and the code becomes
+easier to maintain and reuse.
+
+
+--------------------------------------------------
+END OF WEEK 6 — WEDNESDAY
+--------------------------------------------------

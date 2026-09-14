@@ -1,0 +1,491 @@
+# Week 9 — Pagination, Filtering, Search, Email & Cloudinary
+
+## 🎯 Week Goal
+
+Extend the existing Express + MongoDB API from Week 8 with features that real applications need every day — returning large datasets cleanly, filtering and searching safely, sending emails, and uploading images to the cloud.
+
+By the end of the week, the API should be able to:
+- Return paginated, filtered, sorted, and searched user data
+- Send welcome and password-reset emails
+- Upload, replace, and delete user avatars via Cloudinary
+
+---
+
+## 📅 Day-by-Day Overview
+
+| Day | Focus |
+|-----|-------|
+| Monday | Pagination |
+| Tuesday | Filtering, Sorting, Search |
+| Wednesday | Email Service (Nodemailer) |
+| Thursday | Cloudinary Image Upload |
+| Friday | Integration + Postman testing |
+
+---
+
+# 📅 Monday — Pagination
+
+## 🎯 Why Pagination?
+
+Returning 10,000 users in one request is slow, uses too much bandwidth, and can crash the client. Pagination returns data in small chunks.
+
+```
+Database: 10,000 users
+     ↓
+Page 1: Users 1–10      ← ?page=1&limit=10
+Page 2: Users 11–20     ← ?page=2&limit=10
+Page 3: Users 21–30     ← ?page=3&limit=10
+```
+
+## 🔧 Implementation
+
+Query parameters:
+- `page` — which page (default: 1)
+- `limit` — items per page (default: 10, max: 100)
+
+Skip formula:
+
+```
+skip = (page - 1) * limit
+```
+
+Mongoose query:
+
+```js
+User.find(filter)
+    .skip(skip)
+    .limit(limit)
+```
+
+## 📦 Response Shape
+
+```json
+{
+    "success": true,
+    "message": "Users fetched successfully",
+    "data": [ ... ],
+    "pagination": {
+        "page": 2,
+        "limit": 10,
+        "total": 42,
+        "totalPages": 5,
+        "hasNext": true,
+        "hasPrev": true
+    }
+}
+```
+
+## 🛡️ Edge Cases Handled
+
+| Case | Behavior |
+|------|----------|
+| `?page=999` (out of range) | Returns empty `data: []`, no crash |
+| `?page=abc` (non-number) | Defaults to `page=1` |
+| `?limit=999` (too large) | Capped at 100 |
+| `?limit=0` or negative | Defaults to `limit=1` |
+
+---
+
+# 📅 Tuesday — Filtering, Sorting & Search
+
+## 🎯 Goal
+
+Make `GET /api/users` more useful without exposing the whole query object to MongoDB.
+
+## 1️⃣ Filtering — Allowlist Only
+
+Only approved parameters are read. Everything else is ignored.
+
+```js
+function buildFilter(queryParams) {
+    const filter = {};
+    if (queryParams.role) {
+        filter.role = queryParams.role;   // only "role" is approved
+    }
+    return filter;
+}
+```
+
+Why? Prevents NoSQL injection like `?role[$ne]=null` from reaching MongoDB.
+
+## 2️⃣ Search — Case-Insensitive, Escaped
+
+Searches `name` or `email` for the text (case-insensitive):
+
+```js
+filter.$or = [
+    { name:  { $regex: safeTerm, $options: "i" } },
+    { email: { $regex: safeTerm, $options: "i" } }
+];
+```
+
+Before using the term, escape regex characters:
+
+```js
+function escapeRegex(text) {
+    return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+```
+
+This prevents ReDoS — a malicious regex freezing the database.
+
+## 3️⃣ Sorting
+
+`?sort=name` → ascending
+`?sort=-createdAt` → descending (prefix `-`)
+
+```js
+function buildSort(queryParams) {
+    if (!queryParams.sort) return { createdAt: -1 };
+    const field = queryParams.sort;
+    const desc = field.startsWith("-");
+    const name = desc ? field.substring(1) : field;
+    return { [name]: desc ? -1 : 1 };
+}
+```
+
+## 4️⃣ Field Selection
+
+`?fields=name,email` returns only those fields (plus `_id`).
+
+```js
+function buildFieldSelection(queryParams) {
+    if (!queryParams.fields) return "-password -__v -refreshTokenHash";
+    return queryParams.fields.split(",").join(" ");
+}
+```
+
+## 5️⃣ All Combined
+
+```
+GET /api/users?role=user&search=example&sort=-createdAt&fields=name,email&page=1&limit=5
+```
+
+Pagination metadata reflects the **filtered** set, not the full collection.
+
+---
+
+# 📅 Wednesday — Email Service (Nodemailer)
+
+## 🎯 Goal
+
+Send automated emails from the backend — welcome emails on registration, password-reset emails on request.
+
+## 🔑 Access Tokens vs Setup
+
+- Uses **Nodemailer** with **Gmail SMTP**
+- Requires a **Gmail App Password** (not the regular password)
+- Setup steps: enable 2FA → generate app password → paste into `.env`
+
+```env
+EMAIL_USER=your_email@gmail.com
+EMAIL_PASS=your_app_password
+EMAIL_FROM=your_email@gmail.com
+```
+
+## 🧩 Service Structure
+
+```
+services/email.service.js
+    ├── sendWelcomeEmail(userEmail, userName)
+    └── sendPasswordResetEmail(userEmail, resetToken)
+```
+
+## 📄 HTML Templates
+
+HTML lives in separate files, not inside JavaScript strings:
+
+```
+templates/emails/
+    ├── welcome.html
+    └── reset-password.html
+```
+
+Placeholders use `{{variable}}` and are replaced at send time:
+
+```html
+<h1>Welcome, {{name}}! 🎉</h1>
+```
+
+A small `template.service.js` handles the replacement.
+
+## 🛡️ Failure Handling
+
+```js
+try {
+    await emailService.sendWelcomeEmail(user.email, user.name);
+} catch (error) {
+    console.error("⚠️ Welcome email failed:", error.message);
+    // Do NOT crash — registration already succeeded
+}
+```
+
+Emails fail silently without breaking the API.
+
+---
+
+# 📅 Thursday — Cloudinary Image Upload
+
+## 🎯 Goal
+
+Allow users to upload an avatar. Store the file in Cloudinary (not on the server disk).
+
+```
+Client selects image
+     ↓
+Multer reads multipart/form-data
+     ↓
+multer-storage-cloudinary uploads
+     ↓
+Cloudinary returns URL + publicId
+     ↓
+Server saves them in user document
+```
+
+## 🔧 Setup
+
+- Packages: `multer`, `cloudinary`, `multer-storage-cloudinary`
+- `config/cloudinary.js` — Cloudinary SDK config
+- `middleware/upload.middleware.js` — Multer with Cloudinary storage
+
+Allowed formats: `jpg, jpeg, png, gif, webp, jfif, heic`
+Max size: **5 MB**
+Auto-resize on upload
+
+## 🗂️ Schema Addition
+
+```js
+avatar: {
+    url: { type: String, default: null },
+    publicId: { type: String, default: null }
+}
+```
+
+The `publicId` is required to delete or replace the image later.
+
+## 🔄 Replace Behavior
+
+When a user uploads a new avatar:
+
+```
+Find user
+   ↓
+Has old publicId? → delete old image from Cloudinary
+   ↓
+Save new url + publicId
+```
+
+No orphaned files.
+
+## 🗑️ Delete Behavior
+
+```
+DELETE /api/users/avatar
+   ↓
+Delete image from Cloudinary
+   ↓
+Set avatar.url and avatar.publicId to null
+```
+
+---
+
+# 🏗️ Project Structure
+
+```
+week-9/
+│
+├── config/
+│   └── cloudinary.js
+│
+├── middleware/
+│   ├── auth.middleware.js
+│   └── upload.middleware.js
+│
+├── models/
+│   └── user.model.js
+│
+├── routes/
+│   └── user.routes.js
+│
+├── services/
+│   ├── email.service.js
+│   ├── template.service.js
+│   └── user.service.js
+│
+├── templates/
+│   └── emails/
+│       ├── welcome.html
+│       └── reset-password.html
+│
+├── app.js
+├── .env
+└── package.json
+```
+
+---
+
+# 📡 API Endpoints
+
+## Public
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/users/register` | Register user (sends welcome email) |
+| POST | `/api/users/login` | Login and receive JWT |
+| POST | `/api/users/forgot-password` | Request password reset via email |
+| POST | `/api/users/reset-password` | Reset password with token |
+
+## Protected (`Authorization: Bearer <token>`)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/users` | List users (paginated, filtered, sorted, searched) |
+| GET | `/api/users/profile` | Current user's profile |
+| POST | `/api/users/upload-avatar` | Upload or replace avatar |
+| DELETE | `/api/users/avatar` | Delete avatar |
+
+---
+
+# ⚙️ Setup & Installation
+
+### 1. Install
+
+```bash
+npm install express mongoose dotenv bcrypt jsonwebtoken nodemailer multer cloudinary multer-storage-cloudinary
+```
+
+### 2. Create `.env`
+
+```env
+PORT=3000
+MONGODB_URI=mongodb+srv://USERNAME:PASSWORD@cluster0.xxxxx.mongodb.net/week9_db?retryWrites=true&w=majority
+
+JWT_SECRET=your_access_token_secret
+JWT_EXPIRE=1h
+
+EMAIL_USER=your_email@gmail.com
+EMAIL_PASS=your_app_password
+EMAIL_FROM=your_email@gmail.com
+
+APP_NAME=My Awesome App
+FRONTEND_URL=http://localhost:3000
+
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+```
+
+### 3. Run
+
+```bash
+node app.js
+```
+
+Expected:
+
+```
+✅ Email server is ready to send messages
+✅ MongoDB connected successfully
+🚀 Server running on port 3000
+```
+
+---
+
+# 🧪 Postman Testing Flow
+
+```
+1. Register user
+       ↓
+2. Check inbox for welcome email
+       ↓
+3. Login → copy JWT token
+       ↓
+4. GET /api/users?page=1&limit=5      → pagination metadata
+       ↓
+5. GET /api/users?role=admin&search=example&sort=-createdAt&fields=name,email
+       ↓
+6. POST /api/users/upload-avatar (form-data → avatar)
+       ↓
+7. POST /api/users/upload-avatar again with different image → old auto-deleted
+       ↓
+8. DELETE /api/users/avatar           → removed from Cloudinary + DB
+       ↓
+9. POST /api/users/forgot-password    → check inbox for reset email
+```
+
+Exported Postman collection: `week-9.postman_collection.json`
+
+---
+
+# 🧠 Key Concepts Learned
+
+- Pagination with skip/limit and metadata
+- Max limit enforcement and out-of-range page handling
+- Allowlist pattern for safe query filtering
+- Regex escaping to prevent ReDoS
+- Case-insensitive text search across multiple fields
+- Sorting with direction prefix
+- Field selection to shrink responses
+- Combining pagination + filter + sort + search safely
+- Nodemailer with Gmail App Password
+- HTML email templates with dynamic values
+- Failing gracefully when an email fails
+- Multer + Cloudinary for cloud file storage
+- Storing and using `publicId` to replace/delete images
+- Avoiding local disk storage for uploads
+
+---
+
+# 🔐 Security Notes
+
+| Feature | Handling |
+|---------|----------|
+| Password storage | bcrypt, 10 rounds + salt |
+| Password in responses | Never returned |
+| JWT secret | In `.env`, not in code |
+| Token expiry | 1 hour default |
+| Query injection | Allowlist of approved parameters |
+| Regex injection | Special characters escaped |
+| File upload | 5 MB size limit + format validation |
+| Cloudinary secret | In `.env` |
+
+---
+
+# 📌 Week 9 Final Outcome
+
+```
+USER ACTION
+    ↓
+CLIENT REQUEST
+    ↓
+AUTH MIDDLEWARE (JWT check)
+    ↓
+ROUTE HANDLER
+    ↓
+SERVICE (business logic)
+    ↓
+┌──────────────┬──────────────┬────────────────┐
+↓              ↓              ↓                ↓
+PAGINATION    FILTER       EMAIL           CLOUDINARY
++ SORT        + SEARCH     (Nodemailer)    (Multer)
++ FIELD       (escaped)                    ↓
+              ↓              ↓              ↓
+         MongoDB       Gmail SMTP      Cloud Storage
+              ↓              ↓              ↓
+              └──────┬───────┴──────┬───────┘
+                     ↓
+                JSON RESPONSE
+```
+
+---
+
+## ✅ Objective Achieved
+
+Built a production-ready Express API that handles large datasets with pagination, filters and search safely, sends transactional emails, and manages user avatars through Cloudinary — all without introducing security holes.
+
+---
+
+## 👤 Author
+
+Muhammad Muntaha
+Backend Node.js Internship — Week 9

@@ -485,7 +485,29 @@ Built a production-ready Express API that handles large datasets with pagination
 
 ---
 
-## 👤 Author
+Commands used:
 
-Muhammad Muntaha
-Backend Node.js Internship — Week 9
+```powershell
+git remote -v
+git status --short --branch
+git log -3 --oneline --decorate
+git fetch https://github.com/muntaha221/cmit-internship.git main
+git ls-tree --name-only FETCH_HEAD
+```
+
+```powershell
+git worktree add $pushTree FETCH_HEAD
+Copy-Item week-9 $pushTree -Recurse -Force
+git add week-9
+git commit -m "Add Week 9 internship coursework"
+git push https://github.com/muntaha221/cmit-internship.git HEAD:main
+```
+
+```powershell
+git rm -r --cached week-9/.../node_modules
+git commit -m "Remove Week 9 dependency directories"
+git push https://github.com/muntaha221/cmit-internship.git HEAD:main
+git worktree remove --force $pushTree
+git ls-remote https://github.com/muntaha221/cmit-internship.git refs/heads/main
+git status --short --branch
+```

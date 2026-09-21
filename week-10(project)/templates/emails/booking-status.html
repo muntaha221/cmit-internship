@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking Status Update</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: {{headerColor}};
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 10px 10px 0 0;
+        }
+        .content {
+            padding: 20px;
+        }
+        .details {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .status-badge {
+            background: {{headerColor}};
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+        .footer {
+            text-align: center;
+            color: #999;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{{headerTitle}}</h1>
+        </div>
+        <div class="content">
+            <p>Hello <strong>{{name}}</strong>,</p>
+            <p>{{message}}</p>
+            <div class="details">
+                <h3>Booking Details</h3>
+                <p><strong>Event:</strong> {{eventTitle}}</p>
+                <p><strong>Date:</strong> {{eventDate}}</p>
+                <p><strong>Location:</strong> {{eventLocation}}</p>
+                <p><strong>Status:</strong> <span class="status-badge">{{status}}</span></p>
+            </div>
+            <p>Thank you for using {{appName}}.</p>
+        </div>
+        <div class="footer">
+            <p>This is an automated message. Please do not reply.</p>
+            <p>&copy; 2026 {{appName}}. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

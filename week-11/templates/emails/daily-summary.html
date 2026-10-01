@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Daily Summary</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px; }
+        .header { background: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+        .footer { text-align: center; color: #999; font-size: 12px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Good morning, {{name}}! ☀️</h1>
+        </div>
+        <div style="padding: 20px;">
+            <p>Here's your summary for <strong>{{date}}</strong>.</p>
+            <p>This is an automated message from <strong>{{appName}}</strong>.</p>
+            <p>Have a great day!</p>
+        </div>
+        <div class="footer">
+            <p>&copy; 2026 {{appName}}</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head><title>Socket Test</title></head>
+<body>
+    <h3>Socket.IO Test</h3>
+    <input id="token" placeholder="Paste JWT here" style="width:400px" />
+    <button onclick="connect()">Connect</button>
+    <button onclick="join()">Join Room</button>
+    <br><br>
+    <input id="msg" placeholder="Type message" />
+    <button onclick="send()">Send</button>
+    <ul id="log"></ul>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        let socket;
+
+        function log(t) {
+            const li = document.createElement("li");
+            li.textContent = t;
+            document.getElementById("log").appendChild(li);
+        }
+
+        function connect() {
+            const token = document.getElementById("token").value;
+            socket = io("http://localhost:3000", { auth: { token } });
+
+            socket.on("connect", () => log("✅ Connected: " + socket.id));
+            socket.on("connect_error", (e) => log("❌ " + e.message));
+            socket.on("chat-message", (m) => log(`${m.name}: ${m.text}`));
+            socket.on("user-online", (u) => log(`🟢 ${u.name} online`));
+            socket.on("user-offline", (u) => log(`🔴 ${u.name} offline`));
+            socket.on("online-count", (c) => log(`👥 online: ${c}`));
+            socket.on("user-typing", (u) => log(`${u.name} is typing...`));
+            socket.on("user-stopped-typing", () => log("stopped typing"));
+        }
+
+        function join() {
+            socket.emit("join-room", "general", (res) => {
+                log("Joined. History count: " + (res.history?.length || 0));
+            });
+        }
+
+        function send() {
+            const text = document.getElementById("msg").value;
+            socket.emit("chat-message", { room: "general", text }, (res) => {
+                if (res.success) log("You: " + res.message.text);
+            });
+        }
+    </script>
+</body>
+</html>

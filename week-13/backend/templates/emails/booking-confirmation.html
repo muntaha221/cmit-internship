@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Booking Confirmation</title></head>
+<body style="font-family: Arial; background: #f4f4f4; padding: 20px;">
+    <div style="max-width: 600px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px;">
+        <h1 style="color: #4CAF50;">Booking Confirmed! 🎟️</h1>
+        <p>Hello <strong>{{name}}</strong>,</p>
+        <p>Your booking has been confirmed.</p>
+        <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <h3 style="margin-top: 0;">Booking Details</h3>
+            <p><strong>Event:</strong> {{eventTitle}}</p>
+            <p><strong>Date:</strong> {{eventDate}}</p>
+            <p><strong>Location:</strong> {{eventLocation}}</p>
+            <p><strong>Ticket:</strong> {{ticketType}}</p>
+            <p><strong>Quantity:</strong> {{quantity}}</p>
+            <p><strong>Total:</strong> ${{totalPrice}}</p>
+        </div>
+        <p>See you there!</p>
+        <p style="color: #999; font-size: 12px;">&copy; 2026 {{appName}}</p>
+    </div>
+</body>
+</html>

@@ -1,0 +1,49 @@
+const User = require("../models/user.model");
+const jwt = require("jsonwebtoken");
+const emailService = require("./email.service");
+
+async function registerUser({ name, email, password }) {
+    if (!name) throw new Error("Name is required");
+    if (!email) throw new Error("Email is required");
+    if (!password) throw new Error("Password is required");
+    if (password.length < 6) throw new Error("Password must be at least 6 characters");
+
+    const exists = await User.findOne({ email: email.toLowerCase() });
+    if (exists) throw new Error("Email already registered");
+
+    const user = await User.create({ name, email: email.toLowerCase(), password });
+
+    // fire-and-forget welcome email
+    emailService.sendWelcomeEmail(user.email, user.name);
+
+    return user;
+}
+
+async function loginUser({ email, password }) {
+    if (!email) throw new Error("Email is required");
+    if (!password) throw new Error("Password is required");
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) throw new Error("Invalid email or password");
+
+    const valid = await user.comparePassword(password);
+    if (!valid) throw new Error("Invalid email or password");
+
+    const token = jwt.sign(
+        { userId: user._id, email: user.email, name: user.name, role: user.role },
+        process.env.JWT_SECRET,
+        { expiresIn: process.env.JWT_EXPIRE || "1h" }
+    );
+
+    return {
+        user: {
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role
+        },
+        token
+    };
+}
+
+module.exports = { registerUser, loginUser };

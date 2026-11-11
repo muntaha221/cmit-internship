@@ -1,0 +1,39 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+input CreateEventInput {
+  capacity: Int!
+  location: String!
+  title: String!
+}
+
+input CreateUserInput {
+  email: String!
+  name: String!
+  password: String!
+}
+
+type Event {
+  capacity: Int!
+  id: Int!
+  location: String!
+  title: String!
+}
+
+type Mutation {
+  createEvent(createEventInput: CreateEventInput!): Event!
+  createUser(createUserInput: CreateUserInput!): User!
+}
+
+type Query {
+  events: [Event!]!
+  users: [User!]!
+}
+
+type User {
+  email: String!
+  events: [Event!]
+  id: Int!
+  name: String!
+}
